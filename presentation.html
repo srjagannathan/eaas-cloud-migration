@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contoso Financial: Cloud Migration — Team EAAS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  .deck { width: 100%; height: 100vh; position: relative; }
+
+  .slide {
+    display: none;
+    width: 100%;
+    height: 100vh;
+    padding: 4rem 6rem;
+    flex-direction: column;
+    justify-content: center;
+    position: absolute;
+    top: 0; left: 0;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .slide.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Typography ── */
+  .overline {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #38bdf8;
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #f8fafc;
+    margin-bottom: 1.5rem;
+  }
+
+  h2 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 1.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.25rem;
+    color: #94a3b8;
+    max-width: 640px;
+    line-height: 1.6;
+  }
+
+  /* ── Cards & Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-top: 2rem; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.25rem; margin-top: 2rem; }
+
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .card-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-body {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    margin-bottom: 0.75rem;
+  }
+  .tag-blue   { background: rgba(56,189,248,0.15); color: #38bdf8; }
+  .tag-green  { background: rgba(52,211,153,0.15); color: #34d399; }
+  .tag-orange { background: rgba(251,146,60,0.15);  color: #fb923c; }
+  .tag-purple { background: rgba(167,139,250,0.15); color: #a78bfa; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-size: 0.875rem; }
+  th {
+    text-align: left;
+    padding: 0.6rem 1rem;
+    background: rgba(255,255,255,0.06);
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
+  tr:last-child td { border-bottom: none; }
+  .done   { color: #34d399; font-weight: 600; }
+  .skip   { color: #475569; }
+
+  /* ── Architecture diagram ── */
+  .arch {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    line-height: 1.8;
+    margin-top: 1.5rem;
+    white-space: pre;
+  }
+
+  .arch .hi  { color: #38bdf8; }
+  .arch .aws { color: #fb923c; }
+  .arch .arrow { color: #475569; }
+
+  /* ── Big number ── */
+  .stat { text-align: center; }
+  .stat-num { font-size: 2.5rem; font-weight: 700; color: #38bdf8; }
+  .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.25rem; }
+
+  /* ── Code block ── */
+  .code {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    line-height: 1.6;
+    margin-top: 1rem;
+  }
+  .code .c { color: #34d399; }
+  .code .k { color: #38bdf8; }
+  .code .s { color: #fb923c; }
+
+  /* ── Nav ── */
+  .nav {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 0.6rem 1.25rem;
+    backdrop-filter: blur(8px);
+    z-index: 100;
+  }
+
+  .nav button {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .nav button:hover { color: #e2e8f0; background: rgba(255,255,255,0.06); }
+
+  .nav .counter {
+    font-size: 0.8rem;
+    color: #475569;
+    min-width: 4rem;
+    text-align: center;
+  }
+
+  /* ── Slide number pill ── */
+  .slide-num {
+    position: fixed;
+    top: 1.5rem;
+    right: 2rem;
+    font-size: 0.7rem;
+    color: #334155;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Team badge ── */
+  .team-badge {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #334155;
+  }
+
+  /* ── Accent line ── */
+  .accent-line {
+    width: 48px;
+    height: 3px;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    border-radius: 2px;
+    margin-bottom: 2rem;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; }
+  .list-item {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+  }
+  .list-item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #38bdf8;
+    margin-top: 0.45rem;
+    flex-shrink: 0;
+  }
+  .list-item .text { font-size: 0.9rem; color: #94a3b8; line-height: 1.5; }
+  .list-item .text strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<div class="team-badge">Team EAAS</div>
+<div class="slide-num" id="slideNum">1 / 7</div>
+
+<div class="deck">
+
+  <!-- ── Slide 1: Title ── -->
+  <div class="slide active" id="s1">
+    <div class="overline">Scenario 2 · Cloud Migration</div>
+    <h1>The Lift, the Shift,<br>and the 4am Call</h1>
+    <div class="accent-line"></div>
+    <p class="subtitle">Three workloads. No documentation. A CFO and CTO who disagree. Our team had two hours — and a mandate to build something that still makes sense in 2041, not just 2026.</p>
+    <div class="grid-4" style="margin-top:3rem; max-width:700px;">
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Workloads</div></div>
+      <div class="stat"><div class="stat-num">6</div><div class="stat-label">Challenges</div></div>
+      <div class="stat"><div class="stat-num">4</div><div class="stat-label">Hidden deps</div></div>
+      <div class="stat"><div class="stat-num">15yr</div><div class="stat-label">Design horizon</div></div>
+    </div>
+  </div>
+
+  <!-- ── Slide 2: The Problem ── -->
+  <div class="slide" id="s2">
+    <div class="overline">Challenge 2 · Discovery</div>
+    <h2>What Nobody Told Us</h2>
+    <p class="subtitle" style="margin-bottom:1.5rem;">I had Claude roleplay each stakeholder — the SRE, the DBA, the batch job owner. In under five minutes, we had things that weeks of ticket-reading wouldn't have surfaced.</p>
+    <div class="grid-2">
+      <div>
+        <div class="list-item">
+          <div class="dot"></div>
+          <div class="text"><strong>Hardcoded IP 192.168.10.45</strong> — buried in the web app config, the batch DSN, <em>and</em> a mystery cron. All three workloads are coupled to that one IP. You can't move one without moving all three in the same window.</div>
+        </div>
+        <div class="list-item">
+          <div class="dot"></div>
+          <div class="text"><strong>Shared NFS mount /mnt/nfs/reports/</strong> — the invisible wire between the web app and the batch job. Our SRE only found it when the PDF downloads broke for an hour after a restart. It's now S3.</div>
+        </div>
+      </div>
+      <div>
+        <div class="list-item">
+          <div class="dot"></div>
+          <div class="text"><strong>The warm-ping cron</strong> — <code>curl http://192.168.10.45:5432</code> every five minutes. Nobody knew what it did. Turns out it was keeping pgBouncer alive. I killed it. ElastiCache handles sessions now.</div>
+        </div>
+        <div class="list-item">
+          <div class="dot"></div>
+          <div class="text"><strong>Three years of credential sprawl</strong> — one shared Postgres admin password across five teams, living in spreadsheets and Confluence pages. That gets rotated at cutover. Every team gets their own read-replica endpoint.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Slide 3: The Decision ── -->
+  <div class="slide" id="s3">
+    <div class="overline">Challenge 1 · The Memo &amp; Challenge 3 · The Options</div>
+    <h2>The Calls We Made — and Why They Hold for 15 Years</h2>
+    <div class="two-col">
+      <div>
+        <div class="card" style="border-color: rgba(56,189,248,0.2);">
+          <div class="tag tag-blue">ADR-001 · Migration Pattern</div>
+          <div class="card-title">Lift-and-shift first. Phase 2 in writing.</div>
+          <div class="card-body">Compliance residency closes in weeks, not quarters. Refactoring mid-migration introduces failure modes in a system we're still learning. We deferred the CTO's cloud-native goals by 90 days — not abandoned, committed. The four discovery blockers get resolved regardless of pattern. That's the deal we put in the memo.</div>
+        </div>
+        <div class="card" style="margin-top:1.25rem; border-color: rgba(251,146,60,0.2);">
+          <div class="tag tag-orange">ADR-002 · Revised on 15-year criteria</div>
+          <div class="card-title">We changed three of our four service decisions after stress-testing for longevity</div>
+          <div class="card-body">Our first pass optimised for cutover speed. Our second pass added ecosystem longevity, AI/ML readiness, and OLAP/OLTP separation as criteria. ECS Fargate, RDS, and a read replica for BI all failed that test. EKS, Aurora, and Redshift Serverless passed it.</div>
+        </div>
+      </div>
+      <div>
+        <table>
+          <tr><th>Workload</th><th>Target (revised)</th><th>15-year reason</th></tr>
+          <tr><td>Web app</td><td>EKS + Karpenter (Graviton3)</td><td>Portable; AI/GPU scheduling; no node ops</td></tr>
+          <tr><td>Batch job</td><td>AWS Batch → MSK Phase 2</td><td>Migrate as-is; streaming within 18 months</td></tr>
+          <tr><td>Transactional DB</td><td>Aurora PostgreSQL Serverless v2</td><td>pgvector, Global DB, sub-second RPO</td></tr>
+          <tr><td>BI / Analytics</td><td>Redshift Serverless + S3 lake</td><td>OLAP ≠ OLTP; BI queries never touch Aurora</td></tr>
+          <tr><td>Sessions</td><td>ElastiCache Serverless Redis</td><td>No cluster sizing; scale-to-zero</td></tr>
+          <tr><td>AI layer</td><td>Amazon Bedrock</td><td>Fraud/anomaly detection baked in, not bolted on</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Slide 4: Architecture ── -->
+  <div class="slide" id="s4">
+    <div class="overline">Challenge 4 &amp; 5 · Container + Foundation</div>
+    <h2>What We're Shipping — Phase 1 Today, Built for 2041</h2>
+    <div class="arch"><span class="hi">Internet</span>  <span class="arrow">──→</span>  <span class="aws">CloudFront + WAF</span>  <span class="arrow">──→</span>  <span class="aws">ALB</span>  <span class="arrow">──→</span>  <span class="aws">EKS / Karpenter</span>  (Graviton3 · contoso-web)
+                                                          <span class="arrow">│</span>
+                                         <span class="arrow">├──→</span>  <span class="aws">Aurora PostgreSQL Serverless v2</span>  (pgvector · Global DB)
+                                         <span class="arrow">├──→</span>  <span class="aws">ElastiCache Serverless Redis</span>  (sessions · no cluster sizing)
+                                         <span class="arrow">├──→</span>  <span class="aws">S3 Intelligent-Tiering</span>  (reports · pre-signed URLs)
+                                         <span class="arrow">└──→</span>  <span class="aws">Amazon Bedrock</span>  (fraud/anomaly · doc intelligence)
+
+<span class="hi">EventBridge</span>  <span class="arrow">──→</span>  <span class="aws">AWS Batch</span>  (Phase 1 · reconcile.py)
+                      <span class="arrow">└──→</span>  [<span class="aws">Amazon MSK → stream processor</span>  Phase 2 within 18 months]
+
+<span class="hi">Aurora CDC</span>  <span class="arrow">──→</span>  <span class="aws">Kinesis</span>  <span class="arrow">──→</span>  <span class="aws">S3 Data Lake</span>  <span class="arrow">──→</span>  <span class="aws">Redshift Serverless</span>  (BI team · OLAP separated)
+                                                       <span class="arrow">└──→</span>  <span class="aws">Athena</span>  (ad-hoc SQL · no warehouse needed)
+
+<span class="hi">Observability:</span>  OpenTelemetry  <span class="arrow">──→</span>  <span class="aws">Managed Prometheus</span>  <span class="arrow">──→</span>  <span class="aws">Managed Grafana</span>
+<span class="hi">Security:</span>       GuardDuty · Security Hub · Secrets Manager auto-rotation · Aurora Global DB (DR)
+<span class="hi">Local stand-ins:</span>  MinIO → S3 · Postgres 15 → Aurora · Redis 7 → ElastiCache · docker-compose unchanged</div>
+  </div>
+
+  <!-- ── Slide 5: Claude Code Usage ── -->
+  <div class="slide" id="s5">
+    <div class="overline">How We Used Claude Code</div>
+    <h2>Claude as a Force Multiplier — the Team Made the Calls</h2>
+    <div class="grid-2" style="margin-top:1.5rem;">
+      <div>
+        <div class="card">
+          <div class="tag tag-green">PreToolUse Hook</div>
+          <div class="card-title">We enforce secrets policy at the tool level, not the prompt level</div>
+          <div class="card-body">A <code>CLAUDE.md</code> prompt shapes Claude's preferences — probabilistic, not guaranteed. Our <code>PreToolUse</code> hook in <code>.claude/settings.json</code> blocks any literal credential in a <code>.tf</code> file unconditionally, before the write lands. Claude attempted to inline placeholder values twice during IaC generation; the hook caught both. We documented the distinction in ADR-003 — it's a design principle, not just a config choice.</div>
+        </div>
+        <div class="card" style="margin-top:1.25rem;">
+          <div class="tag tag-blue">Three-Level CLAUDE.md</div>
+          <div class="card-title">Four people, one shared context — no verbal syncing required</div>
+          <div class="card-body">One project-level file captures shared conventions — stack, secrets rule, commands. Three workload-level files (<code>web-app/</code>, <code>batch/</code>, <code>reporting-db/</code>) carry workload-specific constraints. Raymond, Venkat, Saurabh, and Srinath ran Claude sessions in parallel. The shared context meant Claude's outputs stayed consistent across all four streams without the team having to manually align.</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="tag tag-purple">Stakeholder Roleplay</div>
+          <div class="card-title">We used Claude to stress-test assumptions, not replace judgment</div>
+          <div class="card-body">Our team directed Claude to play the SRE, the DBA, and the batch job owner — each in character, each with their own agenda. The warm-ping cron, the NFS coupling, the shared credentials: none of that appears in a config file grep. It surfaced through the roleplay. Claude gave us the raw material; our architects decided what to act on and why. That distinction shows up in every ADR.</div>
+        </div>
+        <div class="card" style="margin-top:1.25rem;">
+          <div class="tag tag-orange">Plan Mode + Second-Pass Architecture</div>
+          <div class="card-title">We ran two passes — Claude helped us pressure-test the first one</div>
+          <div class="card-body">Our first architecture pass optimised for migration speed. We then used Claude to systematically challenge each service choice against a 15-year horizon — portability, AI/ML readiness, OLAP/OLTP separation. ECS Fargate, RDS, and the BI read replica all failed that second pass. The team made the reversal calls. Claude made the analysis faster and more rigorous.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Slide 6: Challenges Status ── -->
+  <div class="slide" id="s6">
+    <div class="overline">Submission</div>
+    <h2>Six Challenges. Two Hours. Here's the Honest Count.</h2>
+    <table>
+      <tr><th>#</th><th>Challenge</th><th>Status</th><th>What's There</th></tr>
+      <tr><td>1</td><td>The Memo</td><td class="done">Done</td><td><code>docs/memo.md</code> — one page, no hedging, risks named and owned</td></tr>
+      <tr><td>2</td><td>The Discovery</td><td class="done">Done</td><td><code>docs/discovery.md</code> — 4 blockers, direct stakeholder quotes, shapes every ADR that follows</td></tr>
+      <tr><td>3</td><td>The Options</td><td class="done">Done</td><td><code>decisions/ADR-001, ADR-002</code> — scored options, a recommendation, no waffling</td></tr>
+      <tr><td>4</td><td>The Container</td><td class="done">Done</td><td>Multi-stage Dockerfile, non-root user, health check — same image goes to ECS with a config swap</td></tr>
+      <tr><td>5</td><td>The Foundation</td><td class="done">Done</td><td>Terraform modules for ECS, RDS, ElastiCache, S3 + full docker-compose local stack + secrets hook</td></tr>
+      <tr><td>6</td><td>The Proof</td><td class="done">Done</td><td>Smoke, contract, and integrity tests — each integrity test traces to a named Discovery finding</td></tr>
+      <tr><td>+</td><td>ADR-003 (Hook vs Prompt)</td><td class="done">Done</td><td><code>decisions/ADR-003</code> — wrote this because the distinction matters and deserved a record</td></tr>
+      <tr><td>7–9</td><td>Scorecard / Undo / Survey</td><td class="skip">Skipped</td><td>Time ran out. Survey is next — it would have automated the discovery we did manually.</td></tr>
+    </table>
+  </div>
+
+  <!-- ── Slide 7: What's Next ── -->
+  <div class="slide" id="s7">
+    <div class="overline">Roadmap — Built Into the Architecture from Day One</div>
+    <h2>Three Phases. Not One Big-Bang Rewrite.</h2>
+    <div class="grid-3" style="margin-top:1.5rem;">
+      <div class="card">
+        <div class="tag tag-orange">Phase 2 · Within 18 Months</div>
+        <div class="card-title">Kill the nightly batch. Move to real-time.</div>
+        <div class="card-body">Nightly reconciliation is an on-prem constraint, not a sound architecture. Our Phase 2 target: Aurora CDC → Amazon MSK → stream processor on EKS. Intraday dashboards via Redshift Serverless. The batch job we built is already decomposed into functions — when we move to MSK, those become stream consumers, not a rewrite. We committed this to the CTO alongside the lift-and-shift decision. It's in writing.</div>
+      </div>
+      <div class="card">
+        <div class="tag tag-blue">Phase 3 · Year 2–3</div>
+        <div class="card-title">AI layer in production. Global DB active.</div>
+        <div class="card-body">Bedrock integration for fraud/anomaly detection and document intelligence — the hooks are in the architecture today. Aurora Global Database second region activated (us-west-2) for sub-second RPO across regions. pgvector queries running against transaction embeddings for risk scoring. OpenTelemetry feeding Grafana dashboards the SRE team actually trusts. None of this requires re-architecture — it's additive on the foundation we're shipping now.</div>
+      </div>
+      <div class="card">
+        <div class="tag tag-purple">Automate Discovery · Challenge 9</div>
+        <div class="card-title">What we did manually should run in CI</div>
+        <div class="card-body">Our team ran stakeholder roleplay manually to surface the four hidden dependencies. Challenge 9 (The Survey) does that automatically: parallel Task subagents, one per workload, explicit context per call, a coordinator that merges structured JSON output. The cross-workload coupling — the one finding that required knowing all three workloads simultaneously — is exactly what a coordinator pattern catches and a single-pass analysis misses. That belongs in CI, not in a team member's head.</div>
+      </div>
+    </div>
+    <div style="margin-top:2.5rem; text-align:center; color:#334155; font-size:0.875rem;">
+      Team EAAS · Raymond Clarance · Venkat Pal · Srinath Jagannathan · Saurabh Aggarwal
+    </div>
+  </div>
+
+</div><!-- .deck -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="go(-1)">&#8592;</button>
+  <span class="counter" id="counter">1 / 7</span>
+  <button onclick="go(1)">&#8594;</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function go(dir) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(slides.length - 1, current + dir));
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = `${current + 1} / ${slides.length}`;
+    document.getElementById('slideNum').textContent = `${current + 1} / ${slides.length}`;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  go(-1);
+  });
+</script>
+</body>
+</html>

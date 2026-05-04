@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport sys, json, os, re\ntry:\n    input_data = json.load(sys.stdin)\nexcept Exception:\n    sys.exit(0)\nfile_path = input_data.get('file_path', '') or input_data.get('path', '')\nif not file_path.endswith(('.tf', '.tfvars')):\n    sys.exit(0)\ncontent = input_data.get('new_string', '') or input_data.get('content', '')\npattern = re.compile(r'(password|secret|token|api_key|private_key)\\\\s*=\\\\s*\\\"[^$\\\\{][^\\\"]{3,}\\\"', re.IGNORECASE)\nif pattern.search(content):\n    print('BLOCKED: plaintext secret detected in IaC file. Use var.* references or data.aws_secretsmanager_secret_version.', file=sys.stderr)\n    sys.exit(2)\nsys.exit(0)\n\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(docker compose up*)",
+      "Bash(docker compose down*)",
+      "Bash(docker build*)",
+      "Bash(terraform init*)",
+      "Bash(terraform validate*)",
+      "Bash(terraform plan*)",
+      "Bash(uv run pytest*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ]
+  }
+}

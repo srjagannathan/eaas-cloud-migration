@@ -1,0 +1,20 @@
+# Secrets — never commit
+.env
+*.env.local
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/.terraform/
+infra/.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+*.tar
+
+# macOS
+.DS_Store
