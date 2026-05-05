@@ -1,3 +1,20 @@
+# =====================================================================
+# Phase 1 IaC — what ships at cutover
+# =====================================================================
+# These modules provision ECS Fargate, RDS PostgreSQL multi-AZ, and
+# ElastiCache Redis. This matches the Phase 1 dispositions in ADR-001
+# (Refactor + Re-platform) and ADR-004 (per-workload 5 Rs).
+#
+# Phase 2 target architecture (EKS + Karpenter, Aurora Serverless v2,
+# Redshift Serverless, Amazon MSK, Bedrock attach point) is documented
+# in ADR-002. Phase 2 commitments — owners, deadlines, success criteria —
+# are in runbooks/cto-office-runbook.md section 4.
+#
+# We deliberately did NOT prematurely upgrade the IaC to Phase 2 services.
+# The Phase 1 stack runs today; the Phase 2 path is reversible at known
+# cost (see runbooks/ops-runbook.md section 4 for rollback procedures).
+# =====================================================================
+
 terraform {
   required_version = ">= 1.7"
 

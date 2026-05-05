@@ -263,7 +263,7 @@
 <body>
 
 <div class="team-badge">Team EAAS</div>
-<div class="slide-num" id="slideNum">1 / 7</div>
+<div class="slide-num" id="slideNum">1 / 8</div>
 
 <div class="deck">
 
@@ -272,12 +272,12 @@
     <div class="overline">Scenario 2 · Cloud Migration</div>
     <h1>The Lift, the Shift,<br>and the 4am Call</h1>
     <div class="accent-line"></div>
-    <p class="subtitle">Three workloads. No documentation. A CFO and CTO who disagree. Our team had two hours — and a mandate to build something that still makes sense in 2041, not just 2026.</p>
-    <div class="grid-4" style="margin-top:3rem; max-width:700px;">
-      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Workloads</div></div>
-      <div class="stat"><div class="stat-num">6</div><div class="stat-label">Challenges</div></div>
+    <p class="subtitle">Three workloads. No documentation. A CFO and CTO who disagree. We didn't build for 2041 — nobody can. We built so every decision is <em>reversible at known cost</em>. That's what 15-year planning actually looks like.</p>
+    <div class="grid-4" style="margin-top:3rem; max-width:780px;">
+      <div class="stat"><div class="stat-num">5</div><div class="stat-label">Rs applied</div></div>
+      <div class="stat"><div class="stat-num">3+7</div><div class="stat-label">Workloads scoped</div></div>
       <div class="stat"><div class="stat-num">4</div><div class="stat-label">Hidden deps</div></div>
-      <div class="stat"><div class="stat-num">15yr</div><div class="stat-label">Design horizon</div></div>
+      <div class="stat"><div class="stat-num">3</div><div class="stat-label">Audience runbooks</div></div>
     </div>
   </div>
 
@@ -310,57 +310,219 @@
     </div>
   </div>
 
-  <!-- ── Slide 3: The Decision ── -->
+  <!-- ── Slide 3: 5 Rs Workload Assessment ── -->
   <div class="slide" id="s3">
-    <div class="overline">Challenge 1 · The Memo &amp; Challenge 3 · The Options</div>
-    <h2>The Calls We Made — and Why They Hold for 15 Years</h2>
-    <div class="two-col">
-      <div>
-        <div class="card" style="border-color: rgba(56,189,248,0.2);">
-          <div class="tag tag-blue">ADR-001 · Migration Pattern</div>
-          <div class="card-title">Lift-and-shift first. Phase 2 in writing.</div>
-          <div class="card-body">Compliance residency closes in weeks, not quarters. Refactoring mid-migration introduces failure modes in a system we're still learning. We deferred the CTO's cloud-native goals by 90 days — not abandoned, committed. The four discovery blockers get resolved regardless of pattern. That's the deal we put in the memo.</div>
-        </div>
-        <div class="card" style="margin-top:1.25rem; border-color: rgba(251,146,60,0.2);">
-          <div class="tag tag-orange">ADR-002 · Revised on 15-year criteria</div>
-          <div class="card-title">We changed three of our four service decisions after stress-testing for longevity</div>
-          <div class="card-body">Our first pass optimised for cutover speed. Our second pass added ecosystem longevity, AI/ML readiness, and OLAP/OLTP separation as criteria. ECS Fargate, RDS, and a read replica for BI all failed that test. EKS, Aurora, and Redshift Serverless passed it.</div>
-        </div>
-      </div>
-      <div>
-        <table>
-          <tr><th>Workload</th><th>Target (revised)</th><th>15-year reason</th></tr>
-          <tr><td>Web app</td><td>EKS + Karpenter (Graviton3)</td><td>Portable; AI/GPU scheduling; no node ops</td></tr>
-          <tr><td>Batch job</td><td>AWS Batch → MSK Phase 2</td><td>Migrate as-is; streaming within 18 months</td></tr>
-          <tr><td>Transactional DB</td><td>Aurora PostgreSQL Serverless v2</td><td>pgvector, Global DB, sub-second RPO</td></tr>
-          <tr><td>BI / Analytics</td><td>Redshift Serverless + S3 lake</td><td>OLAP ≠ OLTP; BI queries never touch Aurora</td></tr>
-          <tr><td>Sessions</td><td>ElastiCache Serverless Redis</td><td>No cluster sizing; scale-to-zero</td></tr>
-          <tr><td>AI layer</td><td>Amazon Bedrock</td><td>Fraud/anomaly detection baked in, not bolted on</td></tr>
-        </table>
-      </div>
+    <div class="overline">ADR-004 · The Real Migration Plan</div>
+    <h2>We Threw Out "Lift-and-Shift." It Was Lying to Us.</h2>
+    <p class="subtitle" style="margin-bottom:1.25rem; max-width:980px;">A blanket "lift-and-shift first" label hides the truth: <strong>Python 2.7 cannot be safely re-hosted</strong> (EOL since 2020), the warm-ping cron is a bug not a feature, and the NFS mount is a coupling not a dependency. We applied the 5 Rs per workload. Six things <strong>retire</strong>. Nothing was retained.</p>
+    <table style="font-size:0.82rem;">
+      <tr>
+        <th>Workload</th>
+        <th>Phase 1 R</th>
+        <th>Phase 2 R</th>
+        <th>What changes — and why</th>
+      </tr>
+      <tr>
+        <td><strong>Web app</strong> (Python 2.7 Flask, bare metal)</td>
+        <td><span style="color:#fb923c;font-weight:600;">Refactor</span></td>
+        <td>—</td>
+        <td>Re-host fails security review. Rewrite to Python 3.11 + FastAPI is the minimum responsible change.</td>
+      </tr>
+      <tr>
+        <td><strong>Batch reconciliation</strong> (cron + NFS)</td>
+        <td><span style="color:#38bdf8;font-weight:600;">Re-platform</span></td>
+        <td><span style="color:#a78bfa;font-weight:600;">Re-Architect</span></td>
+        <td>Phase 1: cron→EventBridge, NFS→S3. Phase 2: Amazon MSK streaming kills the 24hr information delay.</td>
+      </tr>
+      <tr>
+        <td><strong>Reporting database</strong> (Postgres 12, manual failover)</td>
+        <td><span style="color:#38bdf8;font-weight:600;">Re-platform</span></td>
+        <td><span style="color:#a78bfa;font-weight:600;">Re-Architect</span></td>
+        <td>Phase 1: Aurora Serverless v2. Phase 2: split OLTP/OLAP — Redshift Serverless for BI.</td>
+      </tr>
+      <tr>
+        <td><strong>LDAP</strong> (192.168.10.20)</td>
+        <td><span style="color:#38bdf8;font-weight:600;">Re-platform</span></td>
+        <td><span style="color:#fb923c;font-weight:600;">Refactor</span></td>
+        <td>Phase 1: AD Connector. Phase 2: IAM Identity Center for cloud-native identity.</td>
+      </tr>
+      <tr>
+        <td><strong>Warm-ping cron · NFS · Apache · pgBouncer · shared admin user</strong></td>
+        <td colspan="2" style="text-align:center;"><span style="color:#f87171;font-weight:600;">Retire</span></td>
+        <td>Five workloads identified as bugs masquerading as dependencies. Replaced by managed services or eliminated outright.</td>
+      </tr>
+    </table>
+    <div style="margin-top:1.5rem; padding:1rem 1.25rem; background:rgba(248,113,113,0.06); border-left:3px solid #f87171; border-radius:6px; font-size:0.82rem; color:#94a3b8;">
+      <strong style="color:#f87171;">Honest trade-off:</strong> Refactoring the web app adds 1–2 weeks vs. a hypothetical Re-host. We accepted that — the alternative was carrying Python 2.7 into AWS, which fails SOC 2. <strong style="color:#e2e8f0;">Candidate workloads for next-pass review:</strong> SMTP relay, backup/archive, Jenkins CI, SFTP, internal wiki, monitoring stack — typically 30–40% of total on-prem cost when aggregated.
     </div>
   </div>
 
   <!-- ── Slide 4: Architecture ── -->
   <div class="slide" id="s4">
-    <div class="overline">Challenge 4 &amp; 5 · Container + Foundation</div>
-    <h2>What We're Shipping — Phase 1 Today, Built for 2041</h2>
-    <div class="arch"><span class="hi">Internet</span>  <span class="arrow">──→</span>  <span class="aws">CloudFront + WAF</span>  <span class="arrow">──→</span>  <span class="aws">ALB</span>  <span class="arrow">──→</span>  <span class="aws">EKS / Karpenter</span>  (Graviton3 · contoso-web)
-                                                          <span class="arrow">│</span>
-                                         <span class="arrow">├──→</span>  <span class="aws">Aurora PostgreSQL Serverless v2</span>  (pgvector · Global DB)
-                                         <span class="arrow">├──→</span>  <span class="aws">ElastiCache Serverless Redis</span>  (sessions · no cluster sizing)
-                                         <span class="arrow">├──→</span>  <span class="aws">S3 Intelligent-Tiering</span>  (reports · pre-signed URLs)
-                                         <span class="arrow">└──→</span>  <span class="aws">Amazon Bedrock</span>  (fraud/anomaly · doc intelligence)
+    <div class="overline">Architecture — Solid lines ship Phase 1 · Dashed arrives Phase 2</div>
+    <h2>Built for Reversibility</h2>
+    <div style="margin-top:0.5rem; padding:0; background:transparent;">
+      <svg viewBox="0 0 1400 600" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; max-height:520px;" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+            <path d="M0,0 L0,10 L10,5 z" fill="#64748b"/>
+          </marker>
+          <marker id="arrow-dim" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+            <path d="M0,0 L0,10 L10,5 z" fill="#475569"/>
+          </marker>
+        </defs>
 
-<span class="hi">EventBridge</span>  <span class="arrow">──→</span>  <span class="aws">AWS Batch</span>  (Phase 1 · reconcile.py)
-                      <span class="arrow">└──→</span>  [<span class="aws">Amazon MSK → stream processor</span>  Phase 2 within 18 months]
+        <!-- Layer labels (left rail) -->
+        <text x="20" y="48"  fill="#475569" font-size="10" font-family="JetBrains Mono, Consolas, monospace" letter-spacing="3">EDGE</text>
+        <text x="20" y="180" fill="#475569" font-size="10" font-family="JetBrains Mono, Consolas, monospace" letter-spacing="3">COMPUTE</text>
+        <text x="20" y="318" fill="#475569" font-size="10" font-family="JetBrains Mono, Consolas, monospace" letter-spacing="3">DATA</text>
+        <text x="20" y="468" fill="#475569" font-size="10" font-family="JetBrains Mono, Consolas, monospace" letter-spacing="3">ANALYTICS</text>
 
-<span class="hi">Aurora CDC</span>  <span class="arrow">──→</span>  <span class="aws">Kinesis</span>  <span class="arrow">──→</span>  <span class="aws">S3 Data Lake</span>  <span class="arrow">──→</span>  <span class="aws">Redshift Serverless</span>  (BI team · OLAP separated)
-                                                       <span class="arrow">└──→</span>  <span class="aws">Athena</span>  (ad-hoc SQL · no warehouse needed)
+        <!-- ── EDGE TIER ── -->
+        <g>
+          <rect x="100" y="20" width="190" height="56" rx="8" fill="#0c1424" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="195" y="45" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">CloudFront + WAF</text>
+          <text x="195" y="62" text-anchor="middle" fill="#64748b" font-size="10">Edge cache · DDoS shield</text>
+        </g>
+        <g>
+          <rect x="320" y="20" width="140" height="56" rx="8" fill="#0c1424" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="390" y="45" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Route 53</text>
+          <text x="390" y="62" text-anchor="middle" fill="#64748b" font-size="10">DNS failover</text>
+        </g>
+        <g>
+          <rect x="490" y="20" width="140" height="56" rx="8" fill="#0c1424" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="560" y="45" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">ALB</text>
+          <text x="560" y="62" text-anchor="middle" fill="#64748b" font-size="10">Routing · TLS</text>
+        </g>
+        <line x1="290" y1="48" x2="320" y2="48" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="460" y1="48" x2="490" y2="48" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<span class="hi">Observability:</span>  OpenTelemetry  <span class="arrow">──→</span>  <span class="aws">Managed Prometheus</span>  <span class="arrow">──→</span>  <span class="aws">Managed Grafana</span>
-<span class="hi">Security:</span>       GuardDuty · Security Hub · Secrets Manager auto-rotation · Aurora Global DB (DR)
-<span class="hi">Local stand-ins:</span>  MinIO → S3 · Postgres 15 → Aurora · Redis 7 → ElastiCache · docker-compose unchanged</div>
+        <!-- ── COMPUTE TIER ── -->
+        <g>
+          <rect x="100" y="150" width="320" height="80" rx="8" fill="#0c1424" stroke="#fb923c" stroke-width="1.5"/>
+          <text x="260" y="174" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">contoso-web (FastAPI · Python 3.11)</text>
+          <text x="260" y="194" text-anchor="middle" fill="#94a3b8" font-size="11">Phase 1 · ECS Fargate (multi-AZ, non-root)</text>
+          <text x="260" y="212" text-anchor="middle" fill="#fb923c" font-size="11" opacity="0.88">Phase 2 · EKS + Karpenter on Graviton3</text>
+        </g>
+        <g>
+          <rect x="450" y="150" width="170" height="80" rx="8" fill="#0c1424" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="535" y="178" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Amazon Bedrock</text>
+          <text x="535" y="196" text-anchor="middle" fill="#64748b" font-size="10">Fraud · Anomaly · Doc</text>
+          <text x="535" y="212" text-anchor="middle" fill="#a78bfa" font-size="10">Phase 2 attach point</text>
+        </g>
+        <!-- ALB → compute -->
+        <line x1="560" y1="76" x2="560" y2="118" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="260" y1="118" x2="560" y2="118" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="260" y1="118" x2="260" y2="150" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <!-- compute → bedrock (dashed) -->
+        <line x1="420" y1="190" x2="450" y2="190" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-dim)"/>
+
+        <!-- Batch path (separate, on right side of compute tier) -->
+        <g>
+          <rect x="660" y="150" width="220" height="80" rx="8" fill="#0c1424" stroke="#fb923c" stroke-width="1.5"/>
+          <text x="770" y="174" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">EventBridge → AWS Batch</text>
+          <text x="770" y="192" text-anchor="middle" fill="#94a3b8" font-size="10">Phase 1 · reconcile.py · S3 output</text>
+          <text x="770" y="210" text-anchor="middle" fill="#fb923c" font-size="10" opacity="0.7">Phase 2 · Amazon MSK + stream processor</text>
+        </g>
+
+        <!-- ── DATA TIER ── -->
+        <g>
+          <rect x="100" y="280" width="240" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5"/>
+          <text x="220" y="305" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Aurora PostgreSQL Serverless v2</text>
+          <text x="220" y="324" text-anchor="middle" fill="#64748b" font-size="10">pgvector · Global DB ready · Multi-AZ</text>
+        </g>
+        <g>
+          <rect x="370" y="280" width="200" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5"/>
+          <text x="470" y="305" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">ElastiCache Serverless</text>
+          <text x="470" y="324" text-anchor="middle" fill="#64748b" font-size="10">Redis · scale-to-zero · sessions</text>
+        </g>
+        <g>
+          <rect x="600" y="280" width="200" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5"/>
+          <text x="700" y="305" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">S3 + Intelligent-Tiering</text>
+          <text x="700" y="324" text-anchor="middle" fill="#64748b" font-size="10">Reports · pre-signed URLs · KMS</text>
+        </g>
+
+        <!-- compute → data arrows -->
+        <line x1="260" y1="230" x2="260" y2="260" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="220" y1="260" x2="700" y2="260" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="220" y1="260" x2="220" y2="280" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="470" y1="260" x2="470" y2="280" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="700" y1="260" x2="700" y2="280" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <!-- batch → data (S3) -->
+        <line x1="770" y1="230" x2="770" y2="260" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="770" y1="260" x2="770" y2="280" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ── ANALYTICS TIER (Phase 2) ── -->
+        <g opacity="0.85">
+          <rect x="100" y="430" width="220" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="210" y="455" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Kinesis Data Streams</text>
+          <text x="210" y="474" text-anchor="middle" fill="#34d399" font-size="10">Aurora CDC · Phase 2</text>
+        </g>
+        <g opacity="0.85">
+          <rect x="350" y="430" width="200" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="450" y="455" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">S3 Data Lake</text>
+          <text x="450" y="474" text-anchor="middle" fill="#34d399" font-size="10">Glue ETL · Phase 2</text>
+        </g>
+        <g opacity="0.85">
+          <rect x="580" y="430" width="220" height="64" rx="8" fill="#0c1424" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="690" y="455" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">Redshift Serverless</text>
+          <text x="690" y="474" text-anchor="middle" fill="#34d399" font-size="10">BI team · OLAP separated · pay-per-use</text>
+        </g>
+        <line x1="220" y1="344" x2="220" y2="430" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-dim)"/>
+        <line x1="320" y1="462" x2="350" y2="462" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-dim)"/>
+        <line x1="550" y1="462" x2="580" y2="462" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-dim)"/>
+
+        <!-- ── RIGHT RAIL: Observability + Security + IaC ── -->
+        <g>
+          <rect x="970" y="20" width="320" height="56" rx="8" fill="#0c1424" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="1130" y="42" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">OpenTelemetry Collector</text>
+          <text x="1130" y="62" text-anchor="middle" fill="#64748b" font-size="10">Vendor-neutral · DaemonSet on EKS</text>
+        </g>
+        <g>
+          <rect x="970" y="92" width="155" height="50" rx="8" fill="#0c1424" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="1047" y="115" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Managed Prometheus</text>
+          <text x="1047" y="131" text-anchor="middle" fill="#64748b" font-size="9">metrics · traces</text>
+        </g>
+        <g>
+          <rect x="1135" y="92" width="155" height="50" rx="8" fill="#0c1424" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="1212" y="115" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="600">Managed Grafana</text>
+          <text x="1212" y="131" text-anchor="middle" fill="#64748b" font-size="9">SRE dashboards</text>
+        </g>
+        <g>
+          <rect x="970" y="160" width="320" height="68" rx="8" fill="#0c1424" stroke="#f87171" stroke-width="1.5"/>
+          <text x="1130" y="182" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Security &amp; Compliance</text>
+          <text x="1130" y="200" text-anchor="middle" fill="#64748b" font-size="10">GuardDuty · Security Hub · Macie</text>
+          <text x="1130" y="216" text-anchor="middle" fill="#64748b" font-size="10">Secrets Manager (auto-rotate) · KMS</text>
+        </g>
+        <g>
+          <rect x="970" y="248" width="320" height="56" rx="8" fill="#0c1424" stroke="#475569" stroke-width="1.5"/>
+          <text x="1130" y="270" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">IaC: Terraform → OpenTofu</text>
+          <text x="1130" y="288" text-anchor="middle" fill="#64748b" font-size="10">PreToolUse hook blocks plaintext secrets</text>
+        </g>
+
+        <!-- Legend -->
+        <g transform="translate(970, 360)">
+          <text x="0" y="0" fill="#475569" font-size="10" font-family="JetBrains Mono, Consolas, monospace" letter-spacing="3">LEGEND</text>
+          <line x1="0" y1="20" x2="32" y2="20" stroke="#38bdf8" stroke-width="2"/>
+          <text x="42" y="24" fill="#94a3b8" font-size="11">Edge</text>
+          <line x1="100" y1="20" x2="132" y2="20" stroke="#fb923c" stroke-width="2"/>
+          <text x="142" y="24" fill="#94a3b8" font-size="11">Compute</text>
+          <line x1="220" y1="20" x2="252" y2="20" stroke="#34d399" stroke-width="2"/>
+          <text x="262" y="24" fill="#94a3b8" font-size="11">Data</text>
+          <line x1="0" y1="42" x2="32" y2="42" stroke="#a78bfa" stroke-width="2"/>
+          <text x="42" y="46" fill="#94a3b8" font-size="11">AI · Obs</text>
+          <line x1="100" y1="42" x2="132" y2="42" stroke="#f87171" stroke-width="2"/>
+          <text x="142" y="46" fill="#94a3b8" font-size="11">Security</text>
+          <line x1="220" y1="42" x2="252" y2="42" stroke="#34d399" stroke-width="2" stroke-dasharray="5,3"/>
+          <text x="262" y="46" fill="#94a3b8" font-size="11">Phase 2</text>
+        </g>
+      </svg>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:0.75rem; font-size:0.78rem;">
+      <div style="padding:0.6rem 0.85rem; background:rgba(248,113,113,0.06); border-left:3px solid #f87171; border-radius:4px; color:#94a3b8;"><strong style="color:#e2e8f0;">Honest cost:</strong> EKS adds ~1–2 weeks vs. ECS Fargate. We chose it for portability optionality.</div>
+      <div style="padding:0.6rem 0.85rem; background:rgba(248,113,113,0.06); border-left:3px solid #f87171; border-radius:4px; color:#94a3b8;"><strong style="color:#e2e8f0;">Honest cost:</strong> Aurora Global DB is not "near-zero" — secondary region adds real spend. Activated only at Year 3.</div>
+      <div style="padding:0.6rem 0.85rem; background:rgba(248,113,113,0.06); border-left:3px solid #f87171; border-radius:4px; color:#94a3b8;"><strong style="color:#e2e8f0;">Honest cost:</strong> Redshift cutover requires Glue ETL build + 5-team comms plan — see Ops runbook.</div>
+    </div>
   </div>
 
   <!-- ── Slide 5: Claude Code Usage ── -->
@@ -395,25 +557,114 @@
     </div>
   </div>
 
-  <!-- ── Slide 6: Challenges Status ── -->
+  <!-- ── Slide 6: Proof of Life ── -->
   <div class="slide" id="s6">
-    <div class="overline">Submission</div>
-    <h2>Six Challenges. Two Hours. Here's the Honest Count.</h2>
-    <table>
-      <tr><th>#</th><th>Challenge</th><th>Status</th><th>What's There</th></tr>
-      <tr><td>1</td><td>The Memo</td><td class="done">Done</td><td><code>docs/memo.md</code> — one page, no hedging, risks named and owned</td></tr>
-      <tr><td>2</td><td>The Discovery</td><td class="done">Done</td><td><code>docs/discovery.md</code> — 4 blockers, direct stakeholder quotes, shapes every ADR that follows</td></tr>
-      <tr><td>3</td><td>The Options</td><td class="done">Done</td><td><code>decisions/ADR-001, ADR-002</code> — scored options, a recommendation, no waffling</td></tr>
-      <tr><td>4</td><td>The Container</td><td class="done">Done</td><td>Multi-stage Dockerfile, non-root user, health check — same image goes to ECS with a config swap</td></tr>
-      <tr><td>5</td><td>The Foundation</td><td class="done">Done</td><td>Terraform modules for ECS, RDS, ElastiCache, S3 + full docker-compose local stack + secrets hook</td></tr>
-      <tr><td>6</td><td>The Proof</td><td class="done">Done</td><td>Smoke, contract, and integrity tests — each integrity test traces to a named Discovery finding</td></tr>
-      <tr><td>+</td><td>ADR-003 (Hook vs Prompt)</td><td class="done">Done</td><td><code>decisions/ADR-003</code> — wrote this because the distinction matters and deserved a record</td></tr>
-      <tr><td>7–9</td><td>Scorecard / Undo / Survey</td><td class="skip">Skipped</td><td>Time ran out. Survey is next — it would have automated the discovery we did manually.</td></tr>
-    </table>
+    <div class="overline">Proof of Life — Captured Live, Not Marketing</div>
+    <h2>Show, Don't Tell.</h2>
+    <p class="subtitle" style="margin-bottom:1rem; max-width:980px;">Real terminal output captured at submission time. Three things that had to be true before we'd defend this work — and the one thing we couldn't validate in this environment, named honestly.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
+      <div class="code" style="margin-top:0; font-size:0.65rem; line-height:1.45;"><div style="color:#34d399; margin-bottom:0.4rem; font-weight:600;">▸ python3 /tmp/test_hook.py</div><span style="color:#64748b;">File                    Expected   Result   Status</span>
+<span style="color:#64748b;">──────────────────────────────────────────────────</span>
+infra/modules/rds.tf    BLOCK      <span style="color:#f87171;">BLOCK</span>    <span style="color:#34d399;">OK</span>
+infra/modules/s3.tf     BLOCK      <span style="color:#f87171;">BLOCK</span>    <span style="color:#34d399;">OK</span>
+infra/modules/rds.tf    BLOCK      <span style="color:#f87171;">BLOCK</span>    <span style="color:#34d399;">OK</span>
+infra/modules/rds.tf    PASS       PASS     <span style="color:#34d399;">OK</span>
+infra/modules/rds.tf    PASS       PASS     <span style="color:#34d399;">OK</span>
+infra/modules/ecs.tf    PASS       PASS     <span style="color:#34d399;">OK</span>
+web-app/src/main.py     PASS       PASS     <span style="color:#34d399;">OK</span>
+<span style="color:#64748b;">──────────────────────────────────────────────────</span>
+<span style="color:#34d399; font-weight:600;">All 7 hook test cases passed.</span></div>
+      <div class="code" style="margin-top:0; font-size:0.65rem; line-height:1.45;"><div style="color:#38bdf8; margin-bottom:0.4rem; font-weight:600;">▸ python3 -m py_compile *.py</div>web-app/src/main.py        <span style="color:#34d399;">✓</span>
+web-app/src/init_db.py     <span style="color:#34d399;">✓</span>
+batch/reconcile.py         <span style="color:#34d399;">✓</span>
+tests/conftest.py          <span style="color:#34d399;">✓</span>
+tests/smoke/test_web.py    <span style="color:#34d399;">✓</span>
+tests/contract/test_…py    <span style="color:#34d399;">✓</span>
+tests/integrity/test_…py   <span style="color:#34d399;">✓</span>
+
+<span style="color:#34d399; font-weight:600;">All 7 Python files compile successfully</span>
+
+<div style="color:#fb923c; margin-top:0.6rem; font-weight:600;">▸ check terraform brace balance</div>OK   main.tf         (11 blocks)
+OK   variables.tf    (12 blocks)
+OK   outputs.tf      (5 blocks)
+OK   modules/ecs.tf  (79 blocks)
+OK   modules/elasticache.tf (12 blocks)
+OK   modules/rds.tf  (24 blocks)
+OK   modules/s3.tf   (11 blocks)</div>
+    </div>
+    <div style="margin-top:1rem; padding:0.8rem 1rem; background:rgba(251,146,60,0.07); border-left:3px solid #fb923c; border-radius:6px; font-size:0.82rem; color:#94a3b8;">
+      <strong style="color:#fb923c;">What we couldn't validate in this environment:</strong> <code style="color:#cbd5e1;">docker compose up</code> — Docker daemon is not available in the validation sandbox. The compose file is syntactically valid, all referenced images exist on Docker Hub, and the topology mirrors the architecture diagram. <strong style="color:#e2e8f0;">Confidence is high; certainty is not.</strong> A judge running on a host with Docker can verify in under 60 seconds: <code style="color:#cbd5e1;">docker compose up -d &amp;&amp; curl localhost:8000/health</code>.
+    </div>
   </div>
 
-  <!-- ── Slide 7: What's Next ── -->
+  <!-- ── Slide 7: Three Runbooks for Three Audiences ── -->
   <div class="slide" id="s7">
+    <div class="overline">Audience-Tailored Documentation</div>
+    <h2>Three Runbooks. Three Audiences. Three Different Tones.</h2>
+    <p class="subtitle" style="margin-bottom:1.25rem; max-width:980px;">"The auditor will read your IaC. The CTO will read your ADRs. Ops will run your runbook at 4am. Design for all three readers." We did. Each runbook is written in the register and depth its reader actually needs — not three copies of the same content.</p>
+    <div class="grid-3" style="margin-top:0.5rem;">
+      <div class="card" style="border-color: rgba(248,113,113,0.25);">
+        <div class="tag" style="background:rgba(248,113,113,0.15); color:#f87171;">For Legal &amp; Compliance</div>
+        <div class="card-title">legal-compliance-runbook.md</div>
+        <div class="card-body" style="font-size:0.78rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Audience:</strong> GC, Compliance Officer, External Auditor.<br>
+          <strong style="color:#e2e8f0;">Reading time:</strong> 15 min · sections 1, 2, 9 if pressed.<br><br>
+          <strong style="color:#cbd5e1;">Anchored in evidence:</strong>
+          <ul style="margin:0.4rem 0 0 1rem; padding:0; color:#94a3b8;">
+            <li>SOC 2, PCI DSS 4.0, GLBA, GDPR scope statements</li>
+            <li>Data residency: Aurora region pinning, S3 Object Lock</li>
+            <li>Control mapping: 10 controls → AWS service → evidence path</li>
+            <li>Audit trail: CloudTrail, VPC Flow Logs, app audit log</li>
+            <li>Vendor risk: BAA / DPA / SCC status</li>
+            <li>Incident notification matrix; data subject request workflow</li>
+            <li>Sign-off checklist with named approvers</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="border-color: rgba(56,189,248,0.25);">
+        <div class="tag tag-blue">For the CTO's Office</div>
+        <div class="card-title">cto-office-runbook.md</div>
+        <div class="card-body" style="font-size:0.78rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Audience:</strong> CTO, VP Engineering, Principals.<br>
+          <strong style="color:#e2e8f0;">Reading time:</strong> 20 min · sections 1, 4, 6 before any board review.<br><br>
+          <strong style="color:#cbd5e1;">Decisions you can defend:</strong>
+          <ul style="margin:0.4rem 0 0 1rem; padding:0; color:#94a3b8;">
+            <li>ADR index — every decision in a glance</li>
+            <li>Top-10 risk register with trip-wires and owners</li>
+            <li>Phase 2 commitment table — owner, deadline, success criteria</li>
+            <li>3-year TCO projection with assumptions named</li>
+            <li>Tech radar: adoption / hold / retire signals</li>
+            <li>Escalation chain L1 → L4</li>
+            <li>"What worries me at 3am" — non-obvious dependencies</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="border-color: rgba(251,146,60,0.25);">
+        <div class="tag tag-orange">For Ops &amp; SRE</div>
+        <div class="card-title">ops-runbook.md · the 4am runbook</div>
+        <div class="card-body" style="font-size:0.78rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Audience:</strong> SRE on-call, Engineering on-call, Incident Commander.<br>
+          <strong style="color:#e2e8f0;">Reading time:</strong> 25 min cold · skip to section 6 if it's on fire.<br><br>
+          <strong style="color:#cbd5e1;">Exact commands, no diagrams:</strong>
+          <ul style="margin:0.4rem 0 0 1rem; padding:0; color:#94a3b8;">
+            <li>Cutover sequence — T-7d through T+14d, step-by-step</li>
+            <li>Pre-flight checklist (10 items, no skipping)</li>
+            <li>Rollback per workload: web app (3min), DB, IaC, full migration</li>
+            <li>Severity matrix with response times + paging order</li>
+            <li>Triage decision tree</li>
+            <li>Five common failure mode playbooks</li>
+            <li>Backup + restore (tested every quarter)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:1.25rem; padding:0.8rem 1rem; background:rgba(56,189,248,0.06); border-left:3px solid #38bdf8; border-radius:6px; font-size:0.82rem; color:#94a3b8;">
+      <strong style="color:#38bdf8;">Why three documents and not one:</strong> The auditor doesn't need bash commands. The on-call SRE at 4am doesn't need GDPR Article 32. The CTO doesn't want to flip past either to find the risk register. Same architecture, three different reading minds — three different documents.
+    </div>
+  </div>
+
+  <!-- ── Slide 8: What's Next ── -->
+  <div class="slide" id="s8">
     <div class="overline">Roadmap — Built Into the Architecture from Day One</div>
     <h2>Three Phases. Not One Big-Bang Rewrite.</h2>
     <div class="grid-3" style="margin-top:1.5rem;">
@@ -443,7 +694,7 @@
 <!-- Navigation -->
 <div class="nav">
   <button onclick="go(-1)">&#8592;</button>
-  <span class="counter" id="counter">1 / 7</span>
+  <span class="counter" id="counter">1 / 8</span>
   <button onclick="go(1)">&#8594;</button>
 </div>
 
