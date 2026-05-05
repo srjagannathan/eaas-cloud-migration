@@ -27,22 +27,61 @@ The repo contains production-ready artifacts that run locally with cloud-equival
 
 Six adjacent components retired. **No workloads were retained on-prem.** Full analysis: [`decisions/ADR-004-five-rs-workload-assessment.md`](decisions/ADR-004-five-rs-workload-assessment.md).
 
-## Challenges Attempted
+## Challenge Resolution Summary
 
-| # | Challenge | Status | Notes |
-|---|---|---|---|
-| 1 | The Memo | done | [`docs/memo.md`](docs/memo.md) — one page, no hedging, risks owned |
-| 2 | The Discovery | done | [`docs/discovery.md`](docs/discovery.md) — 4 hidden deps surfaced via stakeholder roleplay |
-| 3 | The Options | done | [`decisions/ADR-001`](decisions/ADR-001-migration-pattern.md) (5 Rs pattern) + [`ADR-002`](decisions/ADR-002-target-cloud-services.md) (services scored on 15-year criteria) |
-| 4 | The Container | done | FastAPI web app, multi-stage Dockerfile, non-root user, health check |
-| 5 | The Foundation | done | Terraform modules (ECS, RDS, ElastiCache, S3) + docker-compose.yml + PreToolUse hook |
-| 6 | The Proof | done | Smoke, contract, and integrity tests; each integrity test traces to a named Discovery finding |
-| + | ADR-003 (Hook vs Prompt) | done | [`decisions/ADR-003`](decisions/ADR-003-secrets-hook-vs-prompt.md) — cert domain artifact |
-| + | ADR-004 (5 Rs assessment) | done | [`decisions/ADR-004`](decisions/ADR-004-five-rs-workload-assessment.md) — per-workload disposition |
-| + | Three audience runbooks | done | [`runbooks/`](runbooks/) — Legal, CTO Office, Ops (4am) |
-| 7 | The Scorecard | skipped | Time constraint |
-| 8 | The Undo | partial | Rollback procedures in [`runbooks/ops-runbook.md`](runbooks/ops-runbook.md) section 4 |
-| 9 | The Survey | skipped | Time constraint — would automate the manual stakeholder roleplay |
+The scenario listed nine challenges. Here is what the team built, decided, and skipped — with the reasoning that produced each outcome.
+
+### Challenge 1 — The Memo  *(role: PM/BA · status: done)*
+
+**The team's resolution.** We wrote a one-page decision memo arguing for cloud migration on lift-and-shift terms — fast time-to-cloud, predictable cost, compliance gap closed in weeks not quarters. **On second-pass review, we reframed.** "Lift-and-shift first" was inaccurate: Python 2.7 cannot be safely re-hosted (EOL since 2020), the warm-ping cron is a bug not a feature, and several "dependencies" warranted retirement, not migration. The memo now defends a per-workload 5 Rs disposition. Risks named, owners assigned. Final artifact: [`docs/memo.md`](docs/memo.md).
+
+### Challenge 2 — The Discovery  *(role: Architect · status: done)*
+
+**The team's resolution.** We used Claude as a thinking partner — roleplaying the SRE, the DBA, and the batch job owner each in character, with their own agendas. In under five minutes the conversations surfaced four hidden dependencies that no config-file grep would have found: a hardcoded IP `192.168.10.45` appearing in three workloads simultaneously (cross-workload coupling), a shared NFS mount `/mnt/nfs/reports/` coupling the web app to the batch job, a warm-ping cron quietly keeping pgBouncer alive, and three years of unrotated credentials shared across five reporting teams. These findings shape every ADR that follows and every integrity test we wrote. Final artifact: [`docs/discovery.md`](docs/discovery.md).
+
+### Challenge 3 — The Options  *(role: Architect · status: done — 4 ADRs)*
+
+**The team's resolution.** Two-pass option scoring. **First pass** optimized for cutover speed — produced ECS Fargate, RDS Postgres, read-replica-for-BI as the recommended targets. **Second pass** added 15-year criteria: ecosystem longevity, AI/ML readiness, OLAP/OLTP separation, portability optionality. Three of four decisions reversed: EKS+Karpenter (Phase 2 target), Aurora PostgreSQL Serverless v2 (from day one), Redshift Serverless + S3 data lake for analytics. Each evaluated on a 1–5 scale across the criteria. We deliberately did *not* prematurely upgrade the Phase 1 IaC — the Phase 1 ECS+RDS stack ships now; the Phase 2 path is reversible at known cost. Final artifacts: [`ADR-001`](decisions/ADR-001-migration-pattern.md) (5 Rs pattern), [`ADR-002`](decisions/ADR-002-target-cloud-services.md) (target services with both passes shown), [`ADR-003`](decisions/ADR-003-secrets-hook-vs-prompt.md) (hook vs. prompt enforcement — explicitly required by scenario), [`ADR-004`](decisions/ADR-004-five-rs-workload-assessment.md) (per-workload 5 Rs disposition).
+
+### Challenge 4 — The Container  *(role: Dev · status: done)*
+
+**The team's resolution.** Multi-stage Dockerfile with `appuser` non-root user and a `HEALTHCHECK` on port 8000. Stage 1 installs dependencies; stage 2 copies only the runtime artifacts. FastAPI application with endpoints `/health`, `/accounts`, `/transactions`, `/reports` (the last using S3 pre-signed URLs to replace the retired NFS coupling). All configuration via environment variables — `DATABASE_URL`, `REDIS_URL`, `S3_ENDPOINT`. **The same image deploys to ECS Fargate (Phase 1) or EKS (Phase 2) with a config swap, no rebuild.** Image is currently x86; in response to the CTO review, Phase 2 commits to Graviton3 (`linux/arm64` build flag) for 30–40% better price-performance. Final artifacts: [`web-app/Dockerfile`](web-app/Dockerfile), [`web-app/src/main.py`](web-app/src/main.py).
+
+### Challenge 5 — The Foundation  *(role: Platform · status: done — IaC + hook + alarms)*
+
+**The team's resolution.** Three layers of infrastructure-as-code:
+1. **Local stand-in stack** — `docker-compose.yml` with MinIO (S3), Postgres 15 (Aurora), Redis 7 (ElastiCache). Same topology as AWS target.
+2. **AWS IaC** — Terraform modules for ECS, RDS, ElastiCache, S3, plus a new [`infra/modules/observability.tf`](infra/modules/observability.tf) added in response to the SRE review. Seven CloudWatch alarms + a dashboard, with SNS → PagerDuty integration. State file in S3 with DynamoDB locking.
+3. **PreToolUse hook** — [`.claude/settings.json`](.claude/settings.json) deterministically blocks plaintext secret patterns in `.tf` files. Tested against 7 cases: 3 expected BLOCK, 4 expected PASS. **All 7 passed** (validated live via `python3 /tmp/test_hook.py`). Why a hook and not a prompt: ADR-003 explains the deterministic-vs-probabilistic distinction. Hook caught two real attempts during this build.
+
+### Challenge 6 — The Proof  *(role: Quality · status: done)*
+
+**The team's resolution.** Three test layers in [`tests/`](tests/):
+- **Smoke** — basic liveness checks (`/health`, `/accounts`, `/transactions`, `/reports`). 7 tests.
+- **Contract** — round-trip validation of every cloud stand-in (Postgres insert+read, Redis set+get, S3 put+get). 8 tests.
+- **Integrity** — **each test traces to a named Discovery finding.** Asserts no hardcoded `192.168.x.x` IPs in source files (catches Discovery #1). Asserts no `/mnt/nfs` references (catches Discovery #2). Asserts no duplicate transaction IDs after batch run (catches Discovery #3 silent-failure). Asserts batch output lands in S3 not local filesystem (catches Discovery #4 NFS coupling). The validation suite is *not* "tests pass" theatre — it actively catches the things that would have broken the migration if left unaddressed. Same suite runs against the local stack today and against AWS endpoints post-cutover by swapping environment variables. Final artifact: [`tests/integrity/test_data_integrity.py`](tests/integrity/test_data_integrity.py).
+
+### Challenge 7 — The Scorecard  *(role: Quality, stretch · status: skipped)*
+
+**The team's resolution.** Time constraint. We were 30 minutes from submission and judged the marginal value of an eval harness for Claude's IaC outputs lower than getting the runbooks audience-tailored and the architecture diagram to real SVG. The Scorecard concept (golden-set of known-good IaC, known-bad patterns, false-confidence rate) is captured as an explicit Phase-1.5 deliverable in [`cto-office-runbook.md`](runbooks/cto-office-runbook.md) Gate 1 (Month 3). It would run in CI on every IaC PR. Owner: Architecture Lead.
+
+### Challenge 8 — The Undo  *(role: Stretch · status: substantially addressed)*
+
+**The team's resolution.** What the scenario described — *"the runbook nobody wants to write but everyone needs at 4am"* — is exactly what we built in [`runbooks/ops-runbook.md`](runbooks/ops-runbook.md). Section 4 contains exact rollback commands per workload: web app rollback (3 minutes, with the precise `aws ecs update-service --task-definition $PREV` command), Aurora rollback from snapshot (with the DBA escalation gate), Terraform rollback via `git revert + plan + apply`, and full migration rollback during the 14-day warm window. Section 4.4 explicitly names the cost of rollback at each stage: trivial Day 1–14, hard Day 15–30, very hard Day 31–60, effectively impossible thereafter. Section 10.3 (added during stakeholder review) commits to a game-day schedule so the rollback commands are practiced, not theoretical. **What we didn't ship:** the Phase 2 streaming rollback (Amazon MSK) — that ADR comes when the Phase 2 architecture is committed to code.
+
+### Challenge 9 — The Survey  *(role: Stretch, agentic · status: skipped)*
+
+**The team's resolution.** Time constraint. The Discovery work in Challenge 2 was done by manually directing Claude through three sequential stakeholder roleplays. The Survey would automate this: parallel Task subagents per workload (one for web app, one for batch, one for reporting database), each given explicit context about the workload it owns, each emitting a structured JSON dependency report; a coordinator merges the outputs and surfaces cross-workload couplings. This is exactly the pattern that would have caught the cross-workload coupling we found manually — a single subagent looking at one workload would not see the same hardcoded IP in three places. **It is the highest-priority Phase 1.5 candidate** (see [`cto-office-runbook.md`](runbooks/cto-office-runbook.md) section 10.5 Gate 4). Captured in "If We Had More Time" with the same priority.
+
+### Bonus deliverables (not in the scenario list)
+
+| Artifact | Why we built it | Where |
+|---|---|---|
+| **ADR-003** — Hook vs. Prompt for secrets | The scenario explicitly references this distinction; we wrote it as the cert-domain artifact | [`decisions/ADR-003-secrets-hook-vs-prompt.md`](decisions/ADR-003-secrets-hook-vs-prompt.md) |
+| **ADR-004** — Per-workload 5 Rs assessment | Replaces blanket "lift-and-shift" framing with per-workload disposition | [`decisions/ADR-004-five-rs-workload-assessment.md`](decisions/ADR-004-five-rs-workload-assessment.md) |
+| **Three audience runbooks** | Scenario brief said: *"the auditor will read your IaC, the CTO will read your ADRs, ops will run your runbook at 4am — design for all three readers."* Same architecture, three different reading minds, three different documents. | [`runbooks/`](runbooks/) |
+| **CloudWatch alarms IaC** | Stakeholder review (SRE) flagged that alarms existed only in markdown. Added 7 alarms + dashboard + SNS topic + PagerDuty integration as code. | [`infra/modules/observability.tf`](infra/modules/observability.tf) |
+| **Stakeholder review responses** | After the deck rewrite, the team simulated a roundtable with Legal/CTO/Ops. 17 concerns surfaced; 17 concrete updates shipped. Each runbook has a §10 or §11 appendix capturing the reviews and responses. | Each runbook's final section |
 
 ## Three Runbooks for Three Audiences
 

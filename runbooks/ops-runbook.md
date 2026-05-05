@@ -430,3 +430,115 @@ For security incidents: include CISO direct phone in the parallel page.
 - The on-call rotation rotates through the team without anyone refusing the page.
 
 If we get all five, the migration is operationally sound. If we don't, there's a specific named gap to fix; address it before adding scope.
+
+---
+
+## 10. Stakeholder review — additions from Ops review
+
+Sections 10.1–10.4 were added in response to a roundtable review by Priya Krishnan (SRE Lead). They close operational gaps identified before go-live sign-off.
+
+### 10.1 Capacity sizing — the math behind the task counts
+
+Discovery surfaced 800 req/min peak, 120 req/min average. The Terraform sets `desired_count = 2`. Here is the math:
+
+| Variable | Value | Source |
+|---|---|---|
+| Peak RPS | 13.3 req/sec (800 / 60) | Discovery interview with SRE |
+| Per-task safe RPS at p95 < 250ms | ~25 req/sec | FastAPI + uvicorn benchmark on 0.5 vCPU / 1 GB Fargate (validated locally; production benchmark scheduled for week 1 post-cutover) |
+| Tasks needed at peak (no headroom) | 1 | 13.3 / 25 |
+| Tasks needed with N-1 fault tolerance | 2 | One can fail and capacity holds |
+| Tasks needed with 3x burst headroom | 3 | 800 × 3 / 60 / 25 = 1.6 → round up |
+
+**Decision: `desired_count = 3`, not 2.** Updated in `infra/modules/ecs.tf`. The original 2 was correct for steady-state but did not absorb a deploy-time task drain (rolling deploy reduces capacity to 1 momentarily) plus a 3x spike scenario.
+
+**Auto-scaling:**
+- Target tracking on ECS service: 70% CPU utilization, scale to maximum 8 tasks
+- Trigger: `aws_appautoscaling_policy` (Phase 2 — adding to IaC after baseline metrics collected)
+- Cooldown: 60 seconds scale-out, 300 seconds scale-in (be cautious about scale-in during sustained load)
+
+**Validation post-cutover:** Run a synthetic load test against staging at 3x peak (40 req/sec sustained for 10 minutes). Capture p95 latency, task CPU, ALB queue depth. Adjust `desired_count` and auto-scaling policy based on observed performance. Target: complete by end of week 2 post-cutover.
+
+### 10.2 Aurora cold-start observability
+
+Aurora Serverless v2 at min ACU = 0.5 has 1–2s cold-start latency on first request after long idle. This is a customer-visible event.
+
+**Mitigation in production:** `min_capacity = 1.0` (not 0.5) in `infra/modules/rds.tf`. Trade-off: ~$80/mo additional baseline cost vs. eliminating the cold-start customer impact.
+
+**Observability:**
+- New CloudWatch metric: `Contoso/Aurora/ColdStartLatency` published by web app on first DB query after process start
+- Alarm: `contoso-prod-aurora-cold-start` fires if cold-start latency > 1.5s, P95 over 5-minute window
+- Dashboard: `contoso-prod` includes cold-start as a separate panel from normal latency
+
+**P95 SLO interpretation:** Cold-start excluded from the customer-facing p95 SLO if it occurs < 0.1% of requests (engineering definition; customer-visible SLO measured at the ALB without exclusion).
+
+### 10.3 Game-day schedule — practiced, not theoretical
+
+A runbook is theatre until someone has executed it. Game-day cadence:
+
+| Frequency | Scenario | Target time | Owner |
+|---|---|---|---|
+| Pre-cutover (T-21d) | Full rollback drill (Ops runbook 4.1, 4.2, 4.3, 4.4) in staging | 90 min total | SRE Lead + Eng |
+| Pre-cutover (T-7d) | Cutover dress rehearsal in staging — every step from section 2.4 | 2 hours | All on-call |
+| Month 1 | Web app rollback (4.1) | < 5 min | SRE on-call rotation |
+| Month 2 | Aurora connection storm playbook (6.4) | < 15 min | DBA + SRE |
+| Month 3 | Full Aurora rollback from snapshot (4.2) in staging | < 60 min | DBA |
+| Month 4 | Backup restoration test (section 7) | < 90 min | DBA |
+| Month 6 | Multi-failure scenario (web app + Aurora replica failure simultaneously) | Variable | All on-call |
+| Quarterly thereafter | Rotating scenario from playbook library | Variable | SRE Lead |
+
+**Recording:** Each game-day produces a one-page report — what worked, what didn't, what to update in the runbook. Reports archived in `runbooks/game-day-logs/`.
+
+**Rotation:** Game-day participation rotates so every on-call engineer executes every major rollback at least once per year.
+
+**Skipping a scheduled game-day requires explicit sign-off from VP Engineering with a documented reason. Skipping is a leading indicator of operational decay.**
+
+### 10.4 Cutover communications — five reporting teams, one window
+
+The migration requires 5 reporting teams to update their connection strings on cutover day. The communications artifact:
+
+**T-30 days:** Initial notification email
+- To: 5 reporting team leads + Tableau admin + PowerBI admin + Excel power-user community
+- Content: cutover date, what changes (connection string + new credentials), training resources, FAQ
+- Sender: VP Engineering + Compliance Officer
+
+**T-14 days:** Technical instructions
+- Per-team document: "How to update your Tableau workbooks for the new connection string" / "How to update PowerBI" / "How to update your custom Python scripts"
+- Each team's IT lead validates instructions on a sandbox copy
+
+**T-7 days:** Office hours (drop-in support)
+- 1-hour sessions, two per day, with Engineering on standby
+- Captures any question we hadn't anticipated; updates the per-team docs
+
+**T-1 day:** Final reminder
+- Cutover window time, on-call contact, escalation path
+- Status page link
+
+**T+0 (cutover):** Comms during cutover
+- Slack channel `#cutover-2026-05` — engineering posts each major step
+- Reporting teams confirm each one has cut over within their window (T+30 to T+60)
+
+**T+1 day:** Post-cutover check-in
+- Email survey to all 5 teams: did your reports run? Any failures? Any anomalies?
+- Engineering responds to issues within 2 business hours
+
+**T+7 days:** Closeout
+- Retrospective with the 5 teams; lessons learned captured in `runbooks/post-cutover-retro.md`
+
+**Templates and contact list:** `runbooks/templates/` (placeholder — to be populated with actual email drafts, FAQ, per-team instructions). Contact list maintained by Engineering Operations Manager (access-controlled to Engineering, Account Mgmt, Executive — not in public repo).
+
+### 10.5 Time-zone coverage during cutover
+
+Cutover window 02:00–04:00 UTC. Coverage map:
+
+| Role | Engineer | Time zone | Local time at cutover start (02:00 UTC) | Awake? |
+|---|---|---|---|---|
+| Incident Commander | TBD | Eastern (US) | 21:00 prior day | Yes — primary on-call |
+| Web app eng | Raymond | Eastern | 21:00 prior day | Yes — staying late |
+| Database eng | Saurabh | Pacific | 18:00 prior day | Yes — earlier shift |
+| Platform eng | Venkat | Central (US) | 20:00 prior day | Yes |
+| SRE on-call | TBD | India | 07:30 (cutover day) | Yes — early start |
+| Backup SRE | TBD | London | 02:00 (cutover day) | On standby; 1-hour response |
+
+**No-single-time-zone rule:** No cutover may proceed with all responders in a single time zone. The redundancy is the point.
+
+**Communication backup:** Slack + Zoom + PagerDuty + cell phone numbers (not Slack DM only). Multi-channel ensures one outage doesn't drop a responder.

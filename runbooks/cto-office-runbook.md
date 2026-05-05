@@ -186,3 +186,104 @@ Things the CTO should be aware of, not because they are imminent risks, but beca
 - The team is ready to defend Phase 3 (whatever that turns out to be) with the same rigor.
 
 **What "ready" means here:** ADRs current, risk register current, commitments current, runbooks current. Nothing is more than one quarter stale.
+
+---
+
+## 10. Stakeholder review — additions from CTO review
+
+Sections 10.1–10.4 were added in response to a roundtable review by David Chen (CTO). They close strategic gaps identified before steering committee sponsorship.
+
+### 10.1 Kill criteria — when do we declare the migration failed?
+
+The migration is declared **failed** and we execute Ops runbook section 4.4 (full rollback) if any one of the following is observed within the first 60 days post-cutover:
+
+| Signal | Threshold | Why this kills the migration |
+|---|---|---|
+| Customer-perceived availability | < 99.9% over any rolling 7-day window | Worse than on-prem baseline; the migration moved us backwards |
+| SEV1 incidents | 2 within 14 days, both rooted in migration changes | Indicates we're not in control of the new system |
+| Cost overrun | > 50% above month-1 forecast for two consecutive months | Margin destruction; CFO can't defend it |
+| Regulatory finding | Any SEV1 finding from the next external audit traceable to migration architecture | Compliance debt is unbounded; cheaper to roll back |
+| Engineering velocity | Story points delivered drops > 40% sustained for 6+ weeks (vs. pre-migration baseline) | Team is in maintenance mode, not building |
+| Customer churn signal | > 2 tier-1 customers cite migration-related issues in renewals discussions | Strategic customer loss outweighs migration savings |
+
+**Kill criterion review cadence:** Weekly during the first 30 days, then monthly. Reviewed by VP Engineering + CTO. Any one signal crossing threshold triggers a steering committee session within 48 hours.
+
+**What "rollback" means at each stage:**
+- **Day 1–14:** Trivial — on-prem is still warm. Ops runbook section 4.4 is one window of work.
+- **Day 15–30:** Hard — on-prem services stopped but data still on disk. Re-provisioning is 1–2 weeks.
+- **Day 31–60:** Very hard — on-prem hardware decommission begins. Rollback means a re-migration to a different cloud or rebuilt on-prem environment. Cost: ~$200K + 6 weeks.
+- **After day 60:** Effectively impossible. Forward-fix only.
+
+**Kill criteria below day 60 mean we have a contingency. After day 60, we own the consequences.**
+
+### 10.2 EKS skills and hiring plan
+
+The Phase 2 EKS migration depends on Kubernetes expertise the current team does not have. This is a real risk; the plan to close it:
+
+| Month | Action | Owner | Budget |
+|---|---|---|---|
+| Month 1 | Identify EKS-skilled SRE candidate via recruiter (target: senior, 5+ yr K8s prod ops) | VP Eng + Recruiter | $25K recruiter fee |
+| Month 2 | Offer extended; hiring close target | VP Eng | Salary band: $220K–280K base + equity |
+| Month 3 | New hire onboards; designs EKS PoC environment | New SRE + Platform Lead | $20K AWS PoC cluster spend |
+| Months 3–6 | Existing 2 SREs complete EKS Foundations + CKA-equivalent training (pluralsight + vendor cert) | All SRE | $5K training + $1K certification fees |
+| Month 6 | Game-day on EKS PoC: simulated outage, simulated rollback | All SRE | Internal time |
+| Months 6–9 | Production EKS cluster provisioned in non-customer-facing environment (CI runners) | Platform | Per Phase 2 IaC |
+| Month 9 | Web app deployed to EKS in staging | Platform + Eng | Per Phase 2 IaC |
+| Month 12 | Production cutover: ECS → EKS | Platform + SRE | Per Phase 2 IaC |
+
+**Contingency: hiring fails or new hire declines.**
+- **Plan A:** Use AWS Professional Services for the migration ($60–80K engagement). Internal team learns alongside.
+- **Plan B:** Defer EKS to month 18 instead of month 12. Phase 2 commitment slips one quarter; communicated proactively to steering committee.
+- **Plan C (last resort):** Skip EKS; remain on ECS. Documented as accepted trade-off; portability optionality is foreclosed. This requires an updated ADR and steering committee approval.
+
+**Decision point:** If by end of month 4 we don't have a signed offer accepted by an EKS-qualified candidate, escalate to the CTO and decide on Plan A/B/C.
+
+### 10.3 TCO sensitivity — low / mid / high scenarios
+
+The Year 1 TCO projection of "$430K" was a single-line estimate. Here is the range:
+
+| Scenario | Year 1 cost | What drives it | Likelihood |
+|---|---|---|---|
+| **Low** | $370K | Aurora ACU usage 50% under estimate; serverless scale-to-zero performs well overnight; Reserved Instance commitments at 70% coverage | 25% |
+| **Mid** | $430K | Baseline assumptions hold; Aurora ACUs scale as expected; standard usage patterns | 50% |
+| **High** | $560K | Aurora ACU usage 2x estimate; ElastiCache provisioned capacity due to latency requirements; cost anomaly alarm fires twice triggering re-architecture | 20% |
+| **Worst** | $720K | All of the above + multi-region active in Year 1 ahead of plan | 5% |
+
+**Year 1 break-even vs. on-prem ($520K) holds in Low and Mid scenarios. High scenario is +8% over on-prem; Worst is +38%.**
+
+**Mitigations for High/Worst scenarios:**
+- Aurora ACU ceiling capped in Terraform (`max_capacity = 32`) — cannot silently scale to budget destruction
+- Cost anomaly CloudWatch alarm (see `infra/modules/observability.tf`) fires at 25% above forecast for 6 hours; triggers manual right-sizing review
+- Monthly cost review by Architecture Lead; quarterly review by CTO + CFO
+- Reserved Instance commitments deferred to Month 4 to allow actual usage baseline collection
+
+**Year 2 and Year 3 sensitivity** has its own model in `runbooks/tco-sensitivity.md` (placeholder — to be populated post-cutover with actual usage data).
+
+### 10.4 Build vs. buy on observability
+
+OpenTelemetry + Managed Prometheus + Managed Grafana = "build." Datadog / New Relic / Honeycomb = "buy." Our reasoning:
+
+| Factor | OTel + Managed Grafana | Datadog | Verdict |
+|---|---|---|---|
+| Year 1 cost (engineer-time + AWS service cost) | ~$60K (1/4 SRE FTE for adoption, ongoing $1K/mo AWS cost) | ~$80K (typical mid-size license) | OTel cheaper |
+| Year 3 cost | ~$36K (steady-state ongoing) | ~$120K (license inflation + scale) | OTel materially cheaper |
+| Time to first value | 4–6 weeks (OTel collector + dashboards) | 2 weeks (Datadog agents + canned dashboards) | Datadog faster |
+| Vendor lock-in | None (export to any backend) | High (custom query language, custom integrations) | OTel more reversible |
+| Engineering distraction | Real (collector tuning, dashboard maintenance) | Low (managed service) | Datadog less burden |
+| AI/ML observability roadmap | Open ecosystem (OTel-compatible AI tracing) | Proprietary | OTel future-proof |
+
+**Decision: OTel + Managed Grafana.** Year-1 cost favors OTel; vendor neutrality is a documented architectural value (ADR-002); engineering capacity is sufficient to absorb the adoption cost. **Reversibility:** if OTel adoption stalls or engineering burden exceeds budget, switching to a commercial APM is straightforward — OTel exporters speak Datadog and Honeycomb formats natively. We can change our mind in 6 months at low cost.
+
+**Reviewed quarterly** as part of the tech radar (section 6).
+
+### 10.5 Candidate workload review — stage gates with dates
+
+| Gate | Date | Deliverable | Decision authority |
+|---|---|---|---|
+| Gate 1: Discovery | Month 3 | 5 Rs disposition for SMTP relay, backups, Jenkins, SFTP, internal wiki, monitoring stack | Architecture Lead |
+| Gate 2: Prioritization | Month 4 | Top-3 ranked by (cost-saving × risk-reduction × effort) | CTO + CFO |
+| Gate 3: Phase 1.5 plan | Month 6 | Detailed migration plan for top-3, with IaC scaffolding | Architecture Lead + Platform Lead |
+| Gate 4: First Phase 1.5 cutover | Month 9 | One adjacent workload migrated | Platform + SRE |
+| Gate 5: Phase 1.5 closeout | Month 15 | All top-3 adjacent workloads migrated; refresh of remaining list | CTO |
+
+**Slip protocol:** Same as Phase 2 commitments — > 30-day slip triggers steering committee review.

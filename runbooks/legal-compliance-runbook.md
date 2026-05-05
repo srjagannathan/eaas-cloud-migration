@@ -192,3 +192,100 @@ The following are documented commitments in ADR-001 and ADR-004:
 ---
 
 **Questions about this runbook:** Compliance Officer (compliance@contoso.com) is the primary point of contact. Engineering on-call can answer technical questions; legal interpretation goes to General Counsel.
+
+---
+
+## 11. Stakeholder review — additions from General Counsel review
+
+Sections 11.1–11.5 were added in response to a roundtable review by Maria Vásquez (GC). They close gaps identified before go-live sign-off.
+
+### 11.1 Cross-system data erasure procedure
+
+When a customer's right-to-erasure request is approved, deletion must propagate across **every** system holding their data. The Aurora soft-delete in section 8 is necessary but not sufficient.
+
+| System | What to delete | How | Retention exception |
+|---|---|---|---|
+| Aurora `accounts` and `transactions` tables | Customer record + linked transactions | Soft-delete (set `deleted_at`); hard-delete after 90-day regulatory hold | None |
+| Aurora automated backups (35-day retention) | Backup snapshots containing customer record | No selective deletion possible; documented as "retained for regulatory recovery only, not accessible for business use." After 35 days, deletion completes by retention rotation. | Documented exception under GDPR Article 17(3)(b) — retention required for regulatory compliance |
+| S3 reconciliation reports | Reports referencing customer transactions | Lifecycle policy on customer-deletion bucket prefix; engineering runs `aws s3api delete-objects` keyed on customer ID | None |
+| S3 audit log archive (Object Lock, 7yr) | Records of customer's API calls / actions | **Cannot delete** — Object Lock + regulatory retention | Documented exception: GLBA / PCI / SOX retention takes precedence over GDPR erasure. Customer notified of legal basis for retention per GDPR Article 17(3)(b). |
+| CloudWatch Logs (90-day retention) | Application logs that may contain customer ID | OTel-layer redaction prevents PII from reaching logs in the first place. Any unredacted log is a defect (P0 to fix). After 90 days, deletion completes by retention rotation. | None — OTel redaction is the control |
+| CloudTrail (7-year retention, Object Lock) | API calls referencing customer resources | **Cannot delete** — Object Lock + regulatory retention | Documented exception under GDPR Article 17(3)(b). |
+| Redshift (Phase 2) + S3 data lake | Customer-derived analytics records | DELETE in Redshift; S3 versioned-delete with version cleanup after 90-day hold | None |
+| ElastiCache (sessions) | Session tokens associated with customer | TTL-based eviction (max 24 hours); manual flush of any session keyed by customer ID | None |
+
+**Erasure completion certificate.** Compliance Officer issues a written certificate to the data subject within 30 days of request, listing which systems were purged and which retain records under regulatory exception (with legal basis cited). Template lives in `runbooks/templates/erasure-certificate.md`.
+
+**Auditor evidence:** Each erasure request generates a CloudTrail event chain (deletion API calls), an S3 inventory delta, and the certificate. Athena query template provided.
+
+### 11.2 KMS key custody — customer-managed CMKs, not AWS-managed keys
+
+For SOC 2 high-assurance and PCI DSS 4.0 sufficiency, Contoso uses **customer-managed CMKs** for all data-at-rest encryption — not AWS-managed default keys. The distinction:
+
+| Encryption layer | Key type | Rationale |
+|---|---|---|
+| Aurora storage encryption | CMK `alias/contoso/aurora` | CMK gives Contoso key access audit trail (CloudTrail events with `kmsKeyId`) and explicit control over IAM grants |
+| S3 reports bucket SSE-KMS | CMK `alias/contoso/s3-reports` | Same; allows per-bucket key segregation |
+| S3 audit log bucket SSE-KMS | CMK `alias/contoso/s3-audit` | Separate key for audit logs — limits blast radius if any other key is compromised |
+| Secrets Manager | AWS-managed (`aws/secretsmanager`) | AWS-managed acceptable here because access control is by IAM, not key |
+| EBS volumes (ECS task ephemeral storage) | AWS-managed (`aws/ebs`) | Ephemeral data; AWS-managed acceptable |
+
+**Rotation:** All CMKs have automatic annual rotation enabled (`enable_key_rotation = true`). CloudTrail captures all `kms:*` operations. Quarterly key access review by Security.
+
+**Owner:** Security team holds the IAM policy that gates `kms:Decrypt` on the CMKs. Compliance Officer reviews the policy quarterly.
+
+### 11.3 PCI DSS scope minimization — technical controls
+
+The claim "cardholder data does not flow through web app or batch in Phase 1" is enforced by three technical controls, not policy alone:
+
+1. **Schema linter** in CI rejects any Aurora migration adding columns matching PAN/CVV/expiry patterns to non-PCI-scope tables. Enforced by GitHub Actions check on the migrations PR.
+2. **AWS Service Control Policy (SCP)** at the OU level prevents Phase 1 workload accounts from invoking AWS Payment Cryptography APIs.
+3. **GuardDuty malware/data-exfil findings** auto-route to Security on any anomalous API call pattern that suggests cardholder data movement.
+
+When Phase 2 introduces cardholder data (via the streaming integration with the payments processor), a separate PCI scoping memo defines the SAQ-D scope and the additional controls — until then, scope is enforced by all three technical mechanisms above.
+
+### 11.4 Vendor exit strategy
+
+| Trigger | Action | Timeline |
+|---|---|---|
+| AWS contract termination notice received | Activate exit playbook | T+0 |
+| Data extraction begins | Aurora export to S3 → external object store; ECR images mirrored to alternative registry | T+1 to T+30 |
+| Service replatforming begins (target: GCP or Azure) | Per-workload migration plan; portable services (EKS, Postgres, S3-compat) cut over first | T+30 to T+180 |
+| AWS environment decommissioned | After 90-day overlap with new platform | T+180 to T+270 |
+
+**Estimated extraction cost:** $X (data egress at AWS rates, calculated quarterly and held in `runbooks/vendor-exit-cost.md` — to be populated). Egress cost is a budgeted line item starting Year 2.
+
+**Portability investments that reduce exit cost:**
+- EKS over ECS (Phase 2) — Kubernetes is portable
+- OpenTofu over Terraform (Phase 2) — license-stable IaC
+- OpenTelemetry over CloudWatch SDK direct calls — vendor-neutral observability
+- Standard PostgreSQL on Aurora — schema portable to any Postgres host
+
+**Right-to-audit:** AWS Customer Agreement section 8 grants right-to-audit through AWS Artifact (SOC reports, ISO certificates). For specific evidence requests beyond Artifact, request submitted via AWS account team with 30-day SLA.
+
+### 11.5 Schrems II Transfer Impact Assessment
+
+For any transfer of EU personal data to AWS US regions (currently only `us-east-1` primary; potentially `us-west-2` Phase 2 secondary), a documented TIA is on file at `runbooks/schrems-ii-tia.md` (to be populated by DPO before any EU customer data is processed).
+
+**Supplementary measures relied upon:**
+- Encryption at rest with customer-managed CMKs (section 11.2) — Contoso retains key custody
+- TLS 1.3 in transit; AWS PrivateLink for service-to-service eliminates public-internet transit
+- Strict IAM access controls; CloudTrail audit; quarterly access review
+- AWS Transparency Report (annual): documented government data request volume and Contoso's response posture
+
+**Trigger for re-assessment:** Any change in US surveillance law affecting Schrems II analysis (FISA 702, EO 12333), or AWS sub-processor change touching EU data flow.
+
+### 11.6 Customer breach notification SLA — contractual obligations
+
+Contoso B2B customer contracts include breach notification SLAs varying by tier:
+
+| Customer tier | Notification SLA from confirmed exposure | Where the clock starts |
+|---|---|---|
+| Tier 1 (top 10 customers, ~60% revenue) | 24 hours | Incident Commander declares SEV1 with confirmed data exposure |
+| Tier 2 (next 100 customers) | 72 hours | Same |
+| Tier 3 (long tail) | Per regulatory minimums (state breach laws) | Same |
+
+**Operational integration:** When the on-call SRE declares SEV1 and forensics confirm data exposure, the Incident Commander notifies Legal within 1 hour (Ops runbook section 6.1 escalation). Legal then executes the customer notification chain per the matrix above. The 24-hour clock starts at the SEV1 declaration timestamp, not at the Legal notification timestamp.
+
+**Tier 1 customer list and contacts:** Maintained by Account Management at `runbooks/tier1-customer-contacts.md` (access-controlled to Legal, Account Management, Executive team — not in public repo).
+

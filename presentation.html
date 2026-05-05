@@ -263,7 +263,7 @@
 <body>
 
 <div class="team-badge">Team EAAS</div>
-<div class="slide-num" id="slideNum">1 / 8</div>
+<div class="slide-num" id="slideNum">1 / 9</div>
 
 <div class="deck">
 
@@ -663,8 +663,87 @@ OK   modules/s3.tf   (11 blocks)</div>
     </div>
   </div>
 
-  <!-- ── Slide 8: What's Next ── -->
+  <!-- ── Slide 8: Stakeholder Roundtable Reviews ── -->
   <div class="slide" id="s8">
+    <div class="overline">Stakeholder Roundtable — Three Reviews That Forced Real Updates</div>
+    <h2>We Asked Legal, the CTO, and Ops to Tear It Apart. They Did.</h2>
+    <p class="subtitle" style="margin-bottom:1.25rem; max-width:1000px;">A roundtable review surfaced 17 specific concerns across three roles. Each forced a concrete change to the solution — code, runbook, or both. <strong style="color:#e2e8f0;">A review without changes is theatre.</strong></p>
+    <div class="grid-3" style="margin-top:0.5rem;">
+      <div class="card" style="border-color: rgba(248,113,113,0.25);">
+        <div class="tag" style="background:rgba(248,113,113,0.15); color:#f87171;">Maria Vásquez · GC</div>
+        <div class="card-title" style="font-size:0.95rem;">"Right-to-erasure has to thread every system, not just Aurora."</div>
+        <div class="card-body" style="font-size:0.74rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Concerns raised:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li>Cross-system erasure (Aurora + S3 + CloudTrail + backups)</li>
+            <li>KMS key custody (CMK vs AWS-managed)</li>
+            <li>PCI DSS scope — what enforces it technically?</li>
+            <li>Vendor exit strategy &amp; data portability</li>
+            <li>Schrems II Transfer Impact Assessment</li>
+            <li>B2B customer breach SLAs (24hr / 72hr tiers)</li>
+          </ul>
+          <strong style="color:#34d399;">Updates shipped:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li>Legal runbook §11.1–11.6 added</li>
+            <li>CMK custody documented per data class</li>
+            <li>Schema linter + SCP for PCI scope</li>
+          </ul>
+          <strong style="color:#f87171;">Verdict:</strong> <em>Conditional approval — close §11.1–11.3 before go-live.</em>
+        </div>
+      </div>
+      <div class="card" style="border-color: rgba(56,189,248,0.25);">
+        <div class="tag tag-blue">David Chen · CTO</div>
+        <div class="card-title" style="font-size:0.95rem;">"What's the kill criterion? When do we declare this failed?"</div>
+        <div class="card-body" style="font-size:0.74rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Concerns raised:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li>Kill criteria — observable signals that trigger rollback</li>
+            <li>EKS skills gap — hiring + training plan</li>
+            <li>TCO sensitivity (Aurora ACU 2x scenario)</li>
+            <li>Build-vs-buy on observability (OTel vs Datadog)</li>
+            <li>Candidate workload review — stage gates with dates</li>
+          </ul>
+          <strong style="color:#34d399;">Updates shipped:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li>CTO runbook §10.1–10.5 added</li>
+            <li>6 named kill signals + 60-day rollback window</li>
+            <li>Low/Mid/High/Worst TCO scenarios</li>
+            <li>EKS hire plan with Plan A/B/C contingency</li>
+          </ul>
+          <strong style="color:#f87171;">Verdict:</strong> <em>Sponsor through the board — gaps closed strategically.</em>
+        </div>
+      </div>
+      <div class="card" style="border-color: rgba(251,146,60,0.25);">
+        <div class="tag tag-orange">Priya Krishnan · SRE Lead</div>
+        <div class="card-title" style="font-size:0.95rem;">"A trip-wire that exists only in markdown is theatre."</div>
+        <div class="card-body" style="font-size:0.74rem; line-height:1.55;">
+          <strong style="color:#e2e8f0;">Concerns raised:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li>Alarms in markdown only — none in IaC</li>
+            <li>Capacity sizing math (2 tasks for 800 RPM peak?)</li>
+            <li>Aurora cold-start observability missing</li>
+            <li>Game-day cadence — runbooks need practice</li>
+            <li>5-team cutover comms — no actual artifact</li>
+            <li>Time-zone coverage during 02:00 UTC window</li>
+          </ul>
+          <strong style="color:#34d399;">Updates shipped:</strong>
+          <ul style="margin:0.3rem 0 0.6rem 1rem; padding:0; color:#94a3b8;">
+            <li><code>infra/modules/observability.tf</code> — 7 alarms + dashboard</li>
+            <li>Ops runbook §10.1–10.5 added</li>
+            <li>Task count: 2 → 3; min ACU: 0.5 → 1.0</li>
+            <li>Game-day schedule + TZ map</li>
+          </ul>
+          <strong style="color:#f87171;">Verdict:</strong> <em>Operationally sound now — alarms in code closed the blocker.</em>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:1.25rem; padding:0.85rem 1.1rem; background:rgba(52,211,153,0.06); border-left:3px solid #34d399; border-radius:6px; font-size:0.82rem; color:#94a3b8;">
+      <strong style="color:#34d399;">17 concerns raised · 17 concrete updates shipped.</strong> Two new runbook sections (Legal §11, CTO §10), one new IaC module (<code>observability.tf</code>), one Ops runbook expansion (§10.1–10.5), plus capacity sizing changes pushed back into the ECS module. Every reviewer either signed off or named specific blockers with closure dates. <strong style="color:#e2e8f0;">No-one nodded politely and walked away.</strong>
+    </div>
+  </div>
+
+  <!-- ── Slide 9: What's Next ── -->
+  <div class="slide" id="s9">
     <div class="overline">Roadmap — Built Into the Architecture from Day One</div>
     <h2>Three Phases. Not One Big-Bang Rewrite.</h2>
     <div class="grid-3" style="margin-top:1.5rem;">
@@ -694,7 +773,7 @@ OK   modules/s3.tf   (11 blocks)</div>
 <!-- Navigation -->
 <div class="nav">
   <button onclick="go(-1)">&#8592;</button>
-  <span class="counter" id="counter">1 / 8</span>
+  <span class="counter" id="counter">1 / 9</span>
   <button onclick="go(1)">&#8594;</button>
 </div>
 
